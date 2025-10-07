@@ -1268,3 +1268,148 @@ function ContactForm() {
 7. Explore React frameworks (Next.js, Gatsby)
 
 Happy learning! 🚀
+
+## Exercises (Practice)
+
+### Beginner
+- Build a Todo App (requirements): Add, toggle complete, delete. Persist todos to localStorage. Keep UI simple.
+  - Hints: use `useState`, `useEffect` for localStorage, unique `id` with `Date.now()` or `crypto.randomUUID()`.
+  - Success criteria: Todos persist across reloads; adding, toggling, deleting works.
+
+- Create a Counter with presets (requirements): Buttons to add +1, -1, reset, and set to preset values (5, 10).
+  - Hints: one `useState` for count, small reusable `Button` component.
+
+### Intermediate
+- User Search (requirements): A search input that filters a list of users fetched from a public API (e.g., https://jsonplaceholder.typicode.com/users). Debounce the query input (300ms).
+  - Hints: `useEffect`, `fetch`, `useRef` or a debounce helper, show loading & error states.
+  - Success criteria: Typing filters results after debounce, network requests minimized.
+
+- Form with Validation (requirements): Build a multi-field signup form (name, email, password, confirm password) with inline validation messages and disabled submit until valid.
+  - Hints: custom `useForm` or `useState` per field, regex for email validation, password match check.
+
+### Advanced
+- Build a small CRUD app with routing (requirements): Create, Read, Update, Delete items (can be local state). Use React Router for separate pages and a context for global state.
+  - Hints: structure with `pages/` and `components/`, `useReducer` for complex state, `Context` to share dispatch.
+
+- Performance tuning (requirements): Take a component-heavy page and optimize it with `React.memo`, `useMemo`, and `useCallback`. Measure render counts with console logs.
+  - Success criteria: Unnecessary renders are eliminated when interacting with unrelated UI.
+
+## React Cheat Sheet (Quick Reference)
+
+- Creating components
+  - Function component: `function MyComp(props) { return <div /> }`
+  - Arrow component: `const MyComp = ({ x }) => <div>{x}</div>`
+
+- Common hooks
+  - useState: `const [state, setState] = useState(initial)`
+  - useEffect: `useEffect(() => { sideEffect(); return cleanup; }, [deps])`
+  - useRef: `const ref = useRef(initial)`
+  - useContext: `const value = useContext(MyContext)`
+  - useMemo: `const memo = useMemo(() => compute(a,b), [a,b])`
+  - useCallback: `const fn = useCallback(() => doSomething(), [deps])`
+
+- Performance
+  - Memoize pure child components: `export default React.memo(Component)`
+  - Avoid inline object/array/function props unless memoized
+  - Keys: prefer stable IDs, avoid array index for keys in dynamic lists
+
+- Forms
+  - Controlled input: `<input value={value} onChange={e => setValue(e.target.value)} />`
+  - Debounce inputs for API calls
+
+- Common patterns
+  - Fetch on mount: `useEffect(() => { fetchData() }, [])`
+  - Cleanup subscriptions in `useEffect` return
+
+## Quick Setup (Windows PowerShell)
+
+These commands assume you have Node.js and npm installed. If not, install from https://nodejs.org/.
+
+Create a Vite React app (recommended):
+
+```powershell
+cd "C:\Users\Win 11\Desktop\random-1000dayscode"
+npm create vite@latest my-react-app -- --template react
+cd my-react-app
+npm install
+npm run dev
+```
+
+Create using Create React App (slower but familiar):
+
+```powershell
+cd "C:\Users\Win 11\Desktop\random-1000dayscode"
+npx create-react-app my-app
+cd my-app
+npm start
+```
+
+Useful PowerShell tips
+- Run PowerShell as Administrator if you hit permission issues while installing global tools.
+- Use double quotes for paths that contain spaces, e.g., `"C:\Users\Win 11\..."`.
+
+## Sample Project Scaffold (Suggested structure)
+
+Project: simple-todos
+
+```
+simple-todos/
+├─ package.json
+├─ README.md
+├─ public/
+│  └─ index.html
+├─ src/
+│  ├─ main.jsx
+│  ├─ App.jsx
+│  ├─ index.css
+│  ├─ components/
+│  │  ├─ TodoList.jsx
+│  │  ├─ TodoItem.jsx
+│  │  └─ TodoForm.jsx
+│  ├─ hooks/
+│  │  └─ useLocalStorage.js
+│  └─ pages/
+│     └─ About.jsx
+└─ .gitignore
+```
+
+Minimal `main.jsx` example (Vite):
+
+```jsx
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import App from './App'
+import './index.css'
+
+createRoot(document.getElementById('root')).render(<App />)
+```
+
+## Interview Questions (Study)
+
+- What is the Virtual DOM and why does React use it?
+- Explain the difference between props and state.
+- When and why would you use `useEffect`? Give examples of dependency arrays.
+- How does reconciliation work in React? What is a key and why is it important?
+- Explain the Context API and when to use it vs prop drilling.
+- What are hooks? Can you write a custom hook example?
+- How would you optimize performance for a list-heavy React app?
+- Describe how to test React components. Which libraries do you use?
+
+## Glossary
+
+- JSX: JavaScript XML — syntax extension that looks like HTML inside JS.
+- Component: Reusable UI building block.
+- Props: Read-only inputs passed from parent to child.
+- State: Internal, mutable data for a component.
+- Hook: Special function (useXXX) to access React features in functional components.
+- Side effect: Operations like data fetching, subscriptions, timers executed outside of render.
+- Context: A way to pass data through the component tree without prop drilling.
+
+---
+
+If you'd like, I can also:
+- scaffold a runnable starter project here in the workspace (I can create files and a working `package.json`),
+- or generate downloadable ZIP containing the sample project,
+- or create a short set of unit tests for one of the exercise solutions.
+
+Let me know which you'd prefer and I will continue.
