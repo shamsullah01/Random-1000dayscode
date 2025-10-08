@@ -340,3 +340,295 @@ services:
 - Examples: https://github.com/nestjs/nest/tree/master/sample
 
 Happy building with NestJS! 🚀
+
+## Advanced NestJS Functionality (Extras)
+
+This section covers common advanced features you will likely use in production NestJS apps, with install notes and small examples.
+
+### WebSockets (Realtime)
+
+Nest has built-in support for WebSockets via `@nestjs/websockets` and adapters (Socket.IO, ws).
+
+Install:
+
+```bash
+npm install --save @nestjs/websockets @nestjs/platform-socket.io socket.io
+```
+
+Basic gateway example:
+
+```ts
+import { WebSocketGateway, SubscribeMessage, MessageBody, WebSocketServer } from '@nestjs/websockets';
+import { Server } from 'socket.io';
+
+@WebSocketGateway()
+export class ChatGateway {
+  @WebSocketServer()
+  server: Server;
+
+  @SubscribeMessage('message')
+  handleMessage(@MessageBody() payload: any) {
+    this.server.emit('message', payload);
+  }
+}
+```
+
+### GraphQL
+
+Nest supports GraphQL with code-first (decorators) or schema-first approaches.
+
+Install (code-first):
+
+```bash
+npm install @nestjs/graphql graphql apollo-server-express
+```
+
+Basic code-first setup in `AppModule`:
+
+```ts
+import { GraphQLModule } from '@nestjs/graphql';
+
+@Module({
+  imports: [
+    GraphQLModule.forRoot({
+      autoSchemaFile: true,
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Resolver example:
+
+```ts
+import { Resolver, Query, Args, Mutation } from '@nestjs/graphql';
+
+@Resolver()
+export class UsersResolver {
+  @Query(() => [User])
+  users() {
+    return this.usersService.findAll();
+  }
+}
+```
+
+### Microservices
+
+Nest provides microservice transport drivers (TCP, Redis, NATS, Kafka, gRPC).
+
+Example (TCP microservice):
+
+```ts
+// main.ts (microservice)
+import { NestFactory } from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
+    transport: Transport.TCP,
+    options: { port: 4000 },
+  });
+  await app.listen();
+}
+
+bootstrap();
+```
+
+### Scheduling (cron jobs)
+
+Install:
+
+```bash
+npm install --save @nestjs/schedule
+```
+
+Example:
+
+```ts
+import { Injectable } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
+
+@Injectable()
+export class TasksService {
+  @Cron(CronExpression.EVERY_MINUTE)
+  handleCron() {
+    console.log('Called every minute');
+  }
+}
+```
+
+### Caching
+
+Install:
+
+```bash
+npm install --save cache-manager
+```
+
+Enable cache in `AppModule`:
+
+```ts
+import { CacheModule } from '@nestjs/common';
+
+@Module({
+  imports: [CacheModule.register({ ttl: 5 })],
+})
+export class AppModule {}
+```
+
+### File Uploads
+
+Using `@nestjs/platform-express` and `multer`:
+
+```bash
+npm install --save @nestjs/platform-express multer
+```
+
+Controller example:
+
+```ts
+import { Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+
+@Controller('upload')
+export class UploadController {
+  @Post()
+  @UseInterceptors(FileInterceptor('file'))
+  uploadFile(@UploadedFile() file: Express.Multer.File) {
+    return { filename: file.originalname };
+  }
+}
+```
+
+### Swagger (API docs)
+
+Install:
+
+```bash
+npm install --save @nestjs/swagger swagger-ui-express
+```
+
+Setup in `main.ts`:
+
+```ts
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+
+const config = new DocumentBuilder()
+  .setTitle('My API')
+  .setDescription('API description')
+  .setVersion('1.0')
+  .build();
+
+const document = SwaggerModule.createDocument(app, config);
+SwaggerModule.setup('api', app, document);
+```
+
+### Health Checks
+
+Install:
+
+```bash
+npm install --save @nestjs/terminus
+```
+
+Basic health check:
+
+```ts
+import { TerminusModule } from '@nestjs/terminus';
+
+@Module({ imports: [TerminusModule] })
+export class AppModule {}
+```
+
+### Mailer
+
+Install (example with nodemailer):
+
+```bash
+npm install --save @nestjs-modules/mailer nodemailer
+```
+
+Basic setup uses the MailerModule. See package docs for configuration.
+
+### Rate Limiting / Throttling
+
+Install:
+
+```bash
+npm install --save @nestjs/throttler
+```
+
+Enable globally:
+
+```ts
+import { ThrottlerModule } from '@nestjs/throttler';
+
+@Module({
+  imports: [ThrottlerModule.forRoot({ ttl: 60, limit: 10 })],
+})
+export class AppModule {}
+```
+
+### Logging
+
+Nest uses a built-in Logger; you can also plug in `winston` or `pino` for structured logging.
+
+Example using built-in Logger:
+
+```ts
+import { Logger } from '@nestjs/common';
+
+const logger = new Logger('Bootstrap');
+logger.log('Application starting...');
+```
+
+### Configuration (dotenv)
+
+Install:
+
+```bash
+npm install --save @nestjs/config
+```
+
+Usage:
+
+```ts
+import { ConfigModule } from '@nestjs/config';
+
+@Module({ imports: [ConfigModule.forRoot({ isGlobal: true })] })
+export class AppModule {}
+```
+
+### Metrics (Prometheus)
+
+Use libraries like `nestjs-prometheus` to expose metrics.
+
+### CQRS (Command Query Responsibility Segregation)
+
+Install:
+
+```bash
+npm install --save @nestjs/cqrs
+```
+
+CQRS helps structure complex applications with commands, events, and query handlers.
+
+### Migrations & Transactions
+
+- For TypeORM use `typeorm` CLI or `nestjs/typeorm` migrations.
+- For Prisma use `prisma migrate dev` and the generated client supports transactions.
+
+### Internationalization (i18n)
+
+Install an i18n package:
+
+```bash
+npm install --save nestjs-i18n
+```
+
+Basic usage allows decorators to translate messages and load JSON resource files.
+
+---
+
+If you want, I can scaffold sample code for any of the above features (for example: a small app with WebSockets + Swagger + Rate limiting and Dockerfile), or implement a Users CRUD with Prisma and migrations. Tell me which feature(s) to scaffold and I'll create the files and run a quick smoke test.
