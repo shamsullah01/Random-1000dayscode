@@ -246,3 +246,209 @@ See `Swagger` section in the main guide to set up `@nestjs/swagger` and annotate
 ---
 
 If you want, I can scaffold a small, runnable example API (Users CRUD) in this workspace with validation, pagination, Swagger, and tests. Tell me which stack you prefer (Prisma or TypeORM) and I'll scaffold it and run a quick smoke test.
+
+## Advanced API Topics (Production-ready patterns)
+
+This section expands on practical, production-focused API concerns and patterns.
+
+### Pagination Strategies
+
+- Offset (page/limit): simple, widely supported. Good for small/medium datasets.
+- Cursor-based: stable for large datasets and avoids skipping/duplication when records change. Use an opaque cursor (base64-encoded id+timestamp).
+- Keyset pagination: fast when using indexed columns.
+
+Example response (offset):
+
+```json
+{
+  "data": [ /* items */ ],
+  "meta": { "page": 2, "limit": 25, "total": 124 },
+  "links": { "self": "/users?page=2&limit=25", "next": "/users?page=3&limit=25" }
+}
+```
+
+Example response (cursor):
+
+```json
+{
+  "data": [ /* items */ ],
+  "meta": { "limit": 50, "nextCursor": "eyJpZCI6MTIzLCJ0IjoiMjAyNS0wOC0wOCJ9" }
+}
+```
+
+### Filtering and Sorting
+
+- Accept filter parameters via query string; validate and sanitize them.
+- Use a `FilterDto` and whitelist allowed fields to prevent SQL injection.
+
+### Caching & HTTP Cache Headers
+
+- Use `CacheModule` internally for server-side caching.
+- Send HTTP caching headers for clients and proxies: `Cache-Control`, `ETag`, `Last-Modified`, `Surrogate-Key`.
+- Example ETag flow: compute a hash of the serialized response; return `ETag` header and respond `304 Not Modified` if the client sends matching `If-None-Match`.
+
+Nest snippet to set ETag manually:
+
+```ts
+import { Controller, Get, Req, Res } from '@nestjs/common';
+import * as crypto from 'crypto';
+
+@Controller('users')
+export class UsersController {
+  @Get()
+  async findAll(@Req() req, @Res() res) {
+    const data = await this.usersService.findAll();
+    const body = JSON.stringify(data);
+    const etag = crypto.createHash('md5').update(body).digest('hex');
+    res.setHeader('ETag', etag);
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+    return res.json(data);
+  }
+}
+```
+
+### Standardized Error Format (RFC7807 - Problem Details)
+
+Return consistent errors using the Problem Details format.
+
+Example:
+
+```json
+{
+  "type": "https://example.com/probs/out-of-credit",
+  "title": "You do not have enough credit.",
+  "status": 403,
+  "detail": "Your current balance is 30, but that costs 50.",
+  "instance": "/account/12345/msgs/abc"
+}
+```
+
+Use an exception filter to format errors globally.
+
+### Idempotency (Safe retried requests)
+
+- Support idempotency keys for mutating endpoints (POST/PUT) so clients can safely retry.
+- Store the key and response (or result) in a fast store (Redis) for a short TTL.
+
+Example approach:
+
+1. Client sends `Idempotency-Key` header with request.
+2. Server checks Redis for existing key: if present, return stored response.
+3. If not present, process request, store response under key, return result.
+
+### Transactions and Consistency
+
+- For multi-step updates use DB transactions (TypeORM `queryRunner`, Prisma `transaction`).
+- Use optimistic locking (version field) or database locking when necessary.
+
+TypeORM transaction example:
+
+```ts
+await this.dataSource.transaction(async manager => {
+  await manager.save(user);
+  await manager.save(order);
+});
+```
+
+### Bulk Operations
+
+- Provide bulk endpoints when clients need to create/update many items (CSV/JSON). Validate per-item and return partial success details.
+- Consider background processing for heavy imports (return `202 Accepted` + job id).
+
+### Background Jobs & Queues
+
+- Use BullMQ or Bee-Queue with `@nestjs/bull` for background processing (emails, imports).
+
+Example with Bull:
+
+```ts
+import { Processor, Process } from '@nestjs/bullmq';
+
+@Processor('import')
+export class ImportProcessor {
+  @Process('file')
+  async handle(job) {
+    // process CSV import
+  }
+}
+```
+
+### Observability: Logging, Tracing, Metrics
+
+- Use structured logging (`pino`, `winston`) and centralize logs.
+- Add tracing with OpenTelemetry (OTel) to correlate requests across services.
+- Expose Prometheus metrics (`nestjs-prometheus`) for request rate, latency, error count.
+
+### API Versioning & Lifecycle
+
+- Version early (URI `/v1/`, header `Accept` or custom header).
+- Maintain documentation and changelog for breaking changes.
+- Deprecate old endpoints gracefully with `Deprecation` headers and scheduled removal.
+
+### Contract Testing and API Mocking
+
+- Use tools like Pact for consumer-driven contract testing.
+- Mock external services in tests using `nock` or WireMock for HTTP.
+
+### Security: OAuth2, Scopes, and JWT
+
+- For user APIs, prefer OAuth2 flows (Authorization Code + PKCE for SPAs/mobile).
+- Use scopes/claims to restrict access to endpoints.
+- Keep token validation short and refresh tokens securely stored.
+
+### Content Negotiation
+
+- Support `Accept` header when you need multiple representations (JSON vs CSV).
+- Use `@Header('Content-Type', 'text/csv')` to override response content type for CSV exports.
+
+### API Documentation & SDK Generation
+
+- Use OpenAPI (Swagger) to generate interactive docs and client SDKs with OpenAPI Generator.
+- Keep the OpenAPI spec in CI and generate SDKs as part of release pipeline.
+
+### GraphQL vs REST Decision Guide
+
+- Use GraphQL for flexible client-driven queries and complex nested fetching.
+- Use REST for simple resource-based APIs, caching, and predictable endpoints.
+
+### Soft Deletes & Auditing
+
+- Implement soft deletes with a `deletedAt` column for recoverability.
+- Maintain audit logs (who changed what and when) either in a separate table or with event sourcing.
+
+### Example: Cursor Pagination with TypeORM
+
+```ts
+async function findWithCursor(limit: number, after?: string) {
+  const qb = this.repo.createQueryBuilder('u').orderBy('u.id', 'ASC').limit(limit + 1);
+  if (after) {
+    qb.where('u.id > :after', { after: parseInt(Buffer.from(after, 'base64').toString()) });
+  }
+  const items = await qb.getMany();
+  const hasMore = items.length > limit;
+  if (hasMore) items.pop();
+  const nextCursor = hasMore ? Buffer.from(String(items[items.length - 1].id)).toString('base64') : null;
+  return { items, nextCursor };
+}
+```
+
+### API Testing Strategy
+
+- Unit tests for services and utilities
+- Integration tests for module-level behaviour with in-memory DB or test DB
+- E2E tests for realistic HTTP flows
+- Contract tests with consumers
+
+### SDK & Client Generation Example
+
+- Generate clients with the OpenAPI generator: `openapi-generator-cli generate -i openapi.json -g typescript-axios -o ./sdk`
+
+### Monitoring & Alerts
+
+- Define SLOs/SLIs (latency p95/p99, error rate) and create alerts when thresholds are breached.
+
+---
+
+If you'd like, I can: scaffold cursor pagination in a sample Users API, add idempotency-key middleware, or add Redis-backed caching and ETag support to a small example. Tell me which feature to implement and I'll create the files and run a smoke test.
