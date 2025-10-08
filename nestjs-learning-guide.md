@@ -632,3 +632,166 @@ Basic usage allows decorators to translate messages and load JSON resource files
 ---
 
 If you want, I can scaffold sample code for any of the above features (for example: a small app with WebSockets + Swagger + Rate limiting and Dockerfile), or implement a Users CRUD with Prisma and migrations. Tell me which feature(s) to scaffold and I'll create the files and run a quick smoke test.
+
+## Operational & Integration Features
+
+Below are additional operational topics and integrations commonly used in production NestJS services.
+
+### Graceful Shutdown
+
+- Handle SIGINT/SIGTERM to close database connections, stop accepting new requests, and finish in-flight requests.
+- Nest supports lifecycle hooks: `beforeApplicationShutdown()` and `onModuleDestroy()` in providers.
+
+Example:
+
+```ts
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+
+@Injectable()
+export class AppService implements OnModuleDestroy {
+  private readonly logger = new Logger(AppService.name);
+
+  async onModuleDestroy() {
+    this.logger.log('Cleaning up resources...');
+    // close DB connections, flush queues
+  }
+}
+```
+
+In `main.ts` enable explicit shutdown (Nest >= 8):
+
+```ts
+const app = await NestFactory.create(AppModule);
+app.enableShutdownHooks();
+await app.listen(3000);
+```
+
+### Server-Sent Events (SSE)
+
+Nest supports SSE via `@Sse()` decorator.
+
+```ts
+import { Controller, Sse } from '@nestjs/common';
+import { interval, map } from 'rxjs';
+
+@Controller('events')
+export class EventsController {
+  @Sse('time')
+  time() {
+    return interval(1000).pipe(map(() => ({ data: new Date().toISOString() })));
+  }
+}
+```
+
+### gRPC
+
+- Use `@nestjs/microservices` with gRPC transport and define `.proto` files.
+
+Install:
+
+```bash
+npm install --save @grpc/grpc-js @grpc/proto-loader
+```
+
+Example gRPC options in `main.ts`:
+
+```ts
+import { Transport } from '@nestjs/microservices';
+
+const app = await NestFactory.createMicroservice(AppModule, {
+  transport: Transport.GRPC,
+  options: {
+    package: 'users',
+    protoPath: join(__dirname, 'users.proto'),
+  },
+});
+```
+
+### OpenTelemetry (Tracing)
+
+Add tracing to correlate requests across services.
+
+Install OpenTelemetry packages and configure an exporter (OTLP, Jaeger).
+
+High-level steps:
+
+1. Install `@opentelemetry/sdk-node`, `@opentelemetry/instrumentation-http`, and exporter.
+2. Initialize SDK at process start before Nest bootstrap.
+
+### Redis Integration (Cache, Job store, Sessions)
+
+Install Redis client and use as a cache store or queue backend:
+
+```bash
+npm install --save ioredis
+```
+
+Use `CacheModule.register({ store: redisStore, host, port })` or use `@nestjs/bull` with Redis for queues.
+
+### S3 (File Storage) & Signed Uploads
+
+Use AWS SDK v3 for uploads and pre-signed URLs.
+
+```bash
+npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+```
+
+Generate a presigned URL to upload directly from the client and keep your server stateless for large files.
+
+### Webhook Handling & Security
+
+- Validate incoming webhooks with HMAC signatures and timestamps to prevent replay attacks.
+- Use background jobs to process webhook payloads asynchronously.
+
+Example HMAC validation:
+
+```ts
+import * as crypto from 'crypto';
+
+function verifySignature(secret: string, payload: string, signature: string) {
+  const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(signature));
+}
+```
+
+### Feature Flags
+
+- Integrate LaunchDarkly, Unleash, or simple in-house flag checks to enable gradual rollouts.
+
+### Serverless (AWS Lambda, Vercel)
+
+- Nest can run in serverless environments using adapters (serverless-http). Keep cold starts low by minimizing dependencies and using AWS Lambda provisioned concurrency if necessary.
+
+### Readiness and Liveness Probes
+
+- Expose `/health/live` and `/health/ready` endpoints via Terminus and include checks for DB connectivity, Redis, and other dependencies.
+
+Example:
+
+```ts
+import { HealthCheckService, HttpHealthIndicator, HealthCheck } from '@nestjs/terminus';
+
+@Controller('health')
+export class HealthController {
+  constructor(private health: HealthCheckService, private http: HttpHealthIndicator) {}
+
+  @Get('ready')
+  @HealthCheck()
+  ready() {
+    return this.health.check([() => this.http.pingCheck('google', 'https://www.google.com')]);
+  }
+}
+```
+
+### Secrets Management
+
+- Use a secrets manager (AWS Secrets Manager, Azure Key Vault) or HashiCorp Vault in production. Avoid storing secrets in repo or plain env files.
+
+### Blue-Green / Canary Deployment Patterns
+
+- Use Kubernetes deployments with readiness/liveness probes to do rolling updates.
+- For canary releases, use traffic-splitting via service mesh (Istio) or ingress rules.
+
+---
+
+I added operational and integration topics. I'll mark this task completed. If you'd like, I can scaffold an example implementing one of these features (for example: Redis-backed idempotency + ETag + readiness probe). Tell me which feature to scaffold and I'll create the project files and run a smoke test.
